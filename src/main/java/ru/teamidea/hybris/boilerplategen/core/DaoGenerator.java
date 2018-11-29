@@ -45,21 +45,30 @@ public class DaoGenerator extends AbstractGenerator {
         );
     }
 
+    private String generateBasePackage(String corePackage, String suffix) {
+        return corePackage.replaceAll(".model([^\\w]|$)", "").concat(suffix);
+    }
+
     public JavaFile generateDaoImplementationFile(boolean withFindAll) {
-        TypeSpec daoImpl = generateDaoImpl(withFindAll, ClassName.get(fileData.getModelPackage().concat(".dao.impl"),
+        final String packageStr = generateBasePackage(fileData.getModelPackage(), ".dao.impl");
+        final String interfacePackageStr = generateBasePackage(fileData.getModelPackage(), ".dao");
+        TypeSpec daoImpl = generateDaoImpl(withFindAll, ClassName.get(interfacePackageStr,
                 fileData.getClassName().concat("Dao")));
 
-        return JavaFile.builder(fileData.getModelPackage().concat(".dao"), daoImpl)
+        return JavaFile.builder(packageStr, daoImpl)
+                       .indent(INDENT)
                        .skipJavaLangImports(true)
                        .build();
     }
 
     public JavaFile generateDaoInterfaceFile(boolean withFindAll) {
         TypeSpec daoInterface = generateDaoInterface(withFindAll);
+        final String packageStr = generateBasePackage(fileData.getModelPackage(), ".dao");
 
-        return JavaFile.builder(fileData.getModelPackage().concat(".dao"), daoInterface)
-                    .skipJavaLangImports(true)
-                    .build();
+        return JavaFile.builder(packageStr, daoInterface)
+                   .skipJavaLangImports(true)
+                   .indent(INDENT)
+                   .build();
     }
 
     private TypeSpec generateDaoInterface(boolean withFindAll) {
@@ -147,6 +156,7 @@ public class DaoGenerator extends AbstractGenerator {
         // Search Methods
         MethodSpec getSearchMethod = MethodSpec.methodBuilder("getBy".concat(capitalized))
                 .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(Override.class)
                 .returns(searchMethodReturnType)
                 .addParameter(getFieldTypeName(fieldData), fieldData.getFieldName(), Modifier.FINAL)
                 .addStatement("$1T query = new $1T($2N)", FS_QUERY_TYPE, fqFindFieldName)
@@ -172,6 +182,7 @@ public class DaoGenerator extends AbstractGenerator {
         if (withFindAll) {
             MethodSpec getFindAllMethod = MethodSpec.methodBuilder("getAll")
                .addModifiers(Modifier.PUBLIC)
+               .addAnnotation(Override.class)
                .returns(ParameterizedTypeName.get(ClassName.get(List.class), searchType))
                .addStatement("$1T query = new $1T($2N)", FS_QUERY_TYPE, fqFindAllFieldName)
                .addStatement("$3T<$1T> result = $2N().search(query)", searchType, getFsServiceMethodName, FS_SEARCH_RESULT_TYPE)

@@ -13,6 +13,8 @@ public abstract class AbstractGenerator {
     @SuppressWarnings("unused")
     private static final Logger LOG = Logger.getLogger(AbstractGenerator.class);
 
+    protected static final String INDENT = "    ";
+
     public static final Map<String, Set<LayerEnum>> layersMap;
     static {
         final Map<String, Set<LayerEnum>> tmpMap = new HashMap<>(3, 1.0f);

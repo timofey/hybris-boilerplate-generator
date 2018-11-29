@@ -33,15 +33,20 @@ public class CoreExtensionFinder {
 
         List<Path> candidates = new LinkedList<>();
         try {
-            Files.walk(platformPath.resolve("../custom"), 2).forEach(p -> {
+            Files.walk(platformPath.resolve("../custom"), 2, FileVisitOption.FOLLOW_LINKS).forEach(p -> {
                 if (Files.isDirectory(p) && isCandidateTo(p.getFileName().toString())) {
                     candidates.add(p);
                 }
             });
 
-            Path strongCandidate = candidates.stream().filter(p -> p.toString().endsWith(CORE_NAME)).findAny().orElse(null);
-            if (strongCandidate != null) {
-                return Collections.singletonList(strongCandidate);
+            List<Path> strongCandidates = candidates.stream().filter(p -> p.toString().endsWith(CORE_NAME))
+                    .collect(Collectors.toList());
+            if (strongCandidates.size() == 1) {
+                return Collections.singletonList(strongCandidates.iterator().next());
+            }
+
+            if (strongCandidates.size() > 1) {
+                return strongCandidates;
             }
 
             return candidates.stream()

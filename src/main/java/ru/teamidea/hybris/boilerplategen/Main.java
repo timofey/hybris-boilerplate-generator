@@ -9,7 +9,11 @@ import ru.teamidea.hybris.boilerplategen.core.enums.LayerEnum;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 
 /**
@@ -99,10 +103,26 @@ public final class Main {
             if (coreExtPathCandidates.size() == 1) {
                 coreExtPath = coreExtPathCandidates.iterator().next();
             } else {
-                LOG.warn("Couldn't determine custom core extension name for sure, please " +
+                System.out.println("Couldn't determine custom core extension name for sure, please " +
                                            "choose from one of the following candidates:");
+                System.out.println();
 
+                for (int i = 0; i < coreExtPathCandidates.size(); i++) {
+                    System.out.println(String.format("%d) %s", i + 1, coreExtPathCandidates.get(i).getFileName().toString()));
+                }
+
+                System.out.println();
+                System.out.print("Please enter number: ");
+                final Scanner scanner = new Scanner(System.in);
+                final int number = scanner.nextInt();
+                if (number < 1 || number > coreExtPathCandidates.size()) {
+                    LOG.error("Entered number is invalid!");
+                    return;
+                }
+                coreExtPath = coreExtPathCandidates.get(number - 1);
+                System.out.println();
             }
+            LOG.info(String.format("Selected core extension: %s", coreExtPath));
             final Set<LayerEnum> layersToGenerate = AbstractGenerator.layersMap.get(generationLayer);
             for (LayerEnum layerEnum : layersToGenerate) {
                 switch (layerEnum) {
@@ -115,10 +135,16 @@ public final class Main {
                         final JavaFile implSource = daoGenerator.generateDaoImplementationFile(true);
                         LOG.debug(implSource);
 
-                        String interfacePath = interfaceSource.packageName.replaceAll("\\.", File.pathSeparator);
-                        String implPath = implSource.packageName.replaceAll("\\.", File.pathSeparator);
-
-                        // generate dao impl
+                        String interfacePathStr = interfaceSource.packageName.replaceAll("\\.", File.separator);
+                        String implPathStr = implSource.packageName.replaceAll("\\.", File.separator);
+                        Path interfacePath = coreExtPath.resolve("src").resolve(interfacePathStr);
+                        Path implPath = coreExtPath.resolve("src").resolve(implPathStr);
+                        /*LOG.debug(interfacePath);
+                        LOG.debug(implPath);*/
+                        filesToWrite.put(interfacePath.resolve(interfaceSource.typeSpec.name.concat(".java")).toFile(),
+                                interfaceSource.toString());
+                        filesToWrite.put(implPath.resolve(implSource.typeSpec.name.concat(".java")).toFile(),
+                                implSource.toString());
                     } break;
                     case SERVICE: {
 
@@ -129,6 +155,12 @@ public final class Main {
                 }
             }
 
+            for (Map.Entry<File, String> entry : filesToWrite.entrySet()) {
+                //TODO: check if file exists
+                LOG.info(String.format("Writing file: %s", entry.getKey()));
+                Files.write(entry.getKey().toPath(), entry.getValue().getBytes(StandardCharsets.UTF_8),
+                        StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+            }
 
         } catch (UnrecognizedOptionException e) {
             LOG.error("Unrecognized option: " + e.getOption(), e);
