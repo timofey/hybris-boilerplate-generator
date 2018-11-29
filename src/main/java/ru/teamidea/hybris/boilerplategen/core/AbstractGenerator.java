@@ -1,5 +1,6 @@
 package ru.teamidea.hybris.boilerplategen.core;
 
+import org.apache.log4j.Logger;
 import ru.teamidea.hybris.boilerplategen.core.enums.LayerEnum;
 
 import java.util.*;
@@ -8,6 +9,10 @@ import java.util.*;
  * Created by Timofey Klyubin on 04.09.18
  */
 public abstract class AbstractGenerator {
+
+    @SuppressWarnings("unused")
+    private static final Logger LOG = Logger.getLogger(AbstractGenerator.class);
+
     public static final Map<String, Set<LayerEnum>> layersMap;
     static {
         final Map<String, Set<LayerEnum>> tmpMap = new HashMap<>(3, 1.0f);

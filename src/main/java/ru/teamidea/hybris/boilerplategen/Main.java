@@ -1,21 +1,23 @@
 package ru.teamidea.hybris.boilerplategen;
 
+import com.squareup.javapoet.JavaFile;
 import org.apache.commons.cli.*;
-import ru.teamidea.hybris.boilerplategen.core.AbstractGenerator;
-import ru.teamidea.hybris.boilerplategen.core.DaoGenerator;
-import ru.teamidea.hybris.boilerplategen.core.ModelClassFinder;
-import ru.teamidea.hybris.boilerplategen.core.ModelDataParser;
+import org.apache.log4j.Logger;
+import ru.teamidea.hybris.boilerplategen.core.*;
 import ru.teamidea.hybris.boilerplategen.core.data.ModelFileData;
 import ru.teamidea.hybris.boilerplategen.core.enums.LayerEnum;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
  * Created by Timofey Klyubin on 14.03.18
  */
 public final class Main {
+
+    private static final Logger LOG = Logger.getLogger(Main.class);
 
     private static final String PLATFORM_OPT_LONG = "platform";
     private static final String MODEL_OPT_LONG = "model";
@@ -47,7 +49,7 @@ public final class Main {
             }
 
             if (command.getOptionValue(MODEL_OPT_LONG).isEmpty()) {
-                System.err.println("Model type name must be specified!");
+                LOG.error("Model type name must be specified!");
                 new HelpFormatter().printHelp(CMD_LINE_SYNTAX, options);
                 return;
             }
@@ -55,18 +57,18 @@ public final class Main {
 
             File platformPath = new File(command.getOptionValue(PLATFORM_OPT_LONG).replaceFirst("^~", System.getProperty("user.home")));
             if (!platformPath.exists()) {
-                System.err.println(String.format("Could not find platform path: %s", platformPath));
+                LOG.error(String.format("Could not find platform path: %s", platformPath));
                 new HelpFormatter().printHelp(CMD_LINE_SYNTAX, options);
                 return;
             }
 
             List<File> foundFiles = new ModelClassFinder().findModelJavaFile(platformPath, command.getOptionValue(MODEL_OPT_LONG));
             if (foundFiles.size() > 1) {
-                System.err.println("Found more than one file!");
-                System.err.println(foundFiles);
+                LOG.error("Found more than one file!");
+                LOG.error(foundFiles);
                 return;
             } else if (foundFiles.isEmpty()) {
-                System.err.println("Model class source code not found.");
+                LOG.error("Model class source code not found.");
                 return;
             }
             ModelFileData fileData = new ModelDataParser().parseModelFile(foundFiles.get(0));
@@ -75,7 +77,7 @@ public final class Main {
                                                    ? command.getOptionValue(LAYER_GEN_OPT_LOG)
                                                    : "dao";
             if (!AbstractGenerator.layersMap.containsKey(generationLayer)) {
-                System.err.println("'" + LAYER_GEN_OPT_LOG + "' option must be one of the following: "
+                LOG.error("'" + LAYER_GEN_OPT_LOG + "' option must be one of the following: "
                                            + AbstractGenerator.layersMap.keySet());
                 new HelpFormatter().printHelp(CMD_LINE_SYNTAX, options);
                 return;
@@ -86,7 +88,21 @@ public final class Main {
              * value - content
              */
             final Map<File, String> filesToWrite = new HashMap<>();
+            final CoreExtensionFinder coreFinder = new CoreExtensionFinder(platformPath.toPath());
+            final List<Path> coreExtPathCandidates = coreFinder.findBaseCustomCorePath();
+            Path coreExtPath = null;
+            if (coreExtPathCandidates.isEmpty()) {
+                LOG.error("Couldn't find custom core extension! Could be an internal error.");
+                // TODO: failover to tmp dir
+                return;
+            }
+            if (coreExtPathCandidates.size() == 1) {
+                coreExtPath = coreExtPathCandidates.iterator().next();
+            } else {
+                LOG.warn("Couldn't determine custom core extension name for sure, please " +
+                                           "choose from one of the following candidates:");
 
+            }
             final Set<LayerEnum> layersToGenerate = AbstractGenerator.layersMap.get(generationLayer);
             for (LayerEnum layerEnum : layersToGenerate) {
                 switch (layerEnum) {
@@ -94,8 +110,13 @@ public final class Main {
                         // generate dao interface
                         DaoGenerator daoGenerator = new DaoGenerator(platformPath, fileData,
                                 Collections.singleton(command.getOptionValue(SEARCH_BY_OPT_LONG)));
-                        System.out.println(daoGenerator.generateDaoInterfaceFile(true));
-                        System.out.println(daoGenerator.generateDaoImplementationFile(true));
+                        final JavaFile interfaceSource = daoGenerator.generateDaoInterfaceFile(true);
+                        LOG.debug(interfaceSource);
+                        final JavaFile implSource = daoGenerator.generateDaoImplementationFile(true);
+                        LOG.debug(implSource);
+
+                        String interfacePath = interfaceSource.packageName.replaceAll("\\.", File.pathSeparator);
+                        String implPath = implSource.packageName.replaceAll("\\.", File.pathSeparator);
 
                         // generate dao impl
                     } break;
@@ -110,10 +131,10 @@ public final class Main {
 
 
         } catch (UnrecognizedOptionException e) {
-            System.err.println("Unrecognized option: " + e.getOption());
+            LOG.error("Unrecognized option: " + e.getOption(), e);
             new HelpFormatter().printHelp(CMD_LINE_SYNTAX, options);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error(e.getMessage(), e);
         }
     }
 }

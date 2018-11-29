@@ -2,6 +2,7 @@ package ru.teamidea.hybris.boilerplategen.core;
 
 import com.squareup.javapoet.*;
 import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
 import ru.teamidea.hybris.boilerplategen.core.data.ModelFieldData;
 import ru.teamidea.hybris.boilerplategen.core.data.ModelFileData;
 
@@ -13,6 +14,9 @@ import java.util.*;
  * Created by Timofey Klyubin on 14.03.18
  */
 public class DaoGenerator extends AbstractGenerator {
+
+    @SuppressWarnings("unused")
+    private static final Logger LOG = Logger.getLogger(DaoGenerator.class);
 
     private static final String FS_PACKAGE = "de.hybris.platform.servicelayer.search";
     private static final String FS_QUERY_CLASS = "FlexibleSearchQuery";
@@ -42,7 +46,7 @@ public class DaoGenerator extends AbstractGenerator {
     }
 
     public JavaFile generateDaoImplementationFile(boolean withFindAll) {
-        TypeSpec daoImpl = generateDaoImpl(withFindAll, ClassName.get(fileData.getModelPackage().concat(".dao"),
+        TypeSpec daoImpl = generateDaoImpl(withFindAll, ClassName.get(fileData.getModelPackage().concat(".dao.impl"),
                 fileData.getClassName().concat("Dao")));
 
         return JavaFile.builder(fileData.getModelPackage().concat(".dao"), daoImpl)

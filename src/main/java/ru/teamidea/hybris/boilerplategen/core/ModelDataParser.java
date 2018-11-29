@@ -1,6 +1,7 @@
 package ru.teamidea.hybris.boilerplategen.core;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.log4j.Logger;
 import ru.teamidea.hybris.boilerplategen.core.data.ModelFieldData;
 import ru.teamidea.hybris.boilerplategen.core.data.ModelFileData;
 
@@ -17,6 +18,8 @@ import java.util.regex.Pattern;
  * Created by Timofey Klyubin on 15.03.18
  */
 public final class ModelDataParser {
+
+    private static final Logger LOG = Logger.getLogger(ModelDataParser.class);
 
     private static final Pattern PACKAGE_PT = Pattern.compile("package\\s+([\\w]+[\\w.]*[\\w]+)\\s*;");
     private static final Pattern CLASS_NAME_PT = Pattern.compile("public\\s+class\\s+([\\w\\d_]+)\\s+extends");
@@ -59,7 +62,7 @@ public final class ModelDataParser {
 
             return data;
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error(e.getMessage(), e);
             return null;
         }
     }
