@@ -1,7 +1,11 @@
 package ru.teamidea.hybris.boilerplategen;
 
 import com.squareup.javapoet.JavaFile;
+import com.ximpleware.ModifyException;
+import com.ximpleware.NavException;
+import com.ximpleware.TranscodeException;
 import org.apache.commons.cli.*;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import ru.teamidea.hybris.boilerplategen.core.*;
 import ru.teamidea.hybris.boilerplategen.core.data.ModelFileData;
@@ -12,7 +16,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 
@@ -48,7 +51,7 @@ public final class Main {
         try {
             CommandLine command = parser.parse(options, args);
             if (command.getOptions().length == 0) {
-                new HelpFormatter().printHelp(CMD_LINE_SYNTAX, options);
+                new HelpFormatter().printHelp(120, CMD_LINE_SYNTAX, "", options, "");
                 return;
             }
 
@@ -92,36 +95,10 @@ public final class Main {
              * value - content
              */
             final Map<File, String> filesToWrite = new HashMap<>();
-            final CoreExtensionFinder coreFinder = new CoreExtensionFinder(platformPath.toPath());
-            final List<Path> coreExtPathCandidates = coreFinder.findBaseCustomCorePath();
-            Path coreExtPath = null;
-            if (coreExtPathCandidates.isEmpty()) {
-                LOG.error("Couldn't find custom core extension! Could be an internal error.");
-                // TODO: failover to tmp dir
-                return;
-            }
-            if (coreExtPathCandidates.size() == 1) {
-                coreExtPath = coreExtPathCandidates.iterator().next();
-            } else {
-                System.out.println("Couldn't determine custom core extension name for sure, please " +
-                                           "choose from one of the following candidates:");
-                System.out.println();
 
-                for (int i = 0; i < coreExtPathCandidates.size(); i++) {
-                    System.out.println(String.format("%d) %s", i + 1, coreExtPathCandidates.get(i).getFileName().toString()));
-                }
+            Path coreExtPath = selectCoreExtPath(platformPath)
+                                       .orElseThrow(() -> new IllegalArgumentException("Couldn't locate custom core extension"));
 
-                System.out.println();
-                System.out.print("Please enter number: ");
-                final Scanner scanner = new Scanner(System.in);
-                final int number = scanner.nextInt();
-                if (number < 1 || number > coreExtPathCandidates.size()) {
-                    LOG.error("Entered number is invalid!");
-                    return;
-                }
-                coreExtPath = coreExtPathCandidates.get(number - 1);
-                System.out.println();
-            }
             LOG.info(String.format("Selected core extension: %s", coreExtPath));
             final Set<LayerEnum> layersToGenerate = AbstractGenerator.layersMap.get(generationLayer);
             for (LayerEnum layerEnum : layersToGenerate) {
@@ -131,20 +108,21 @@ public final class Main {
                         DaoGenerator daoGenerator = new DaoGenerator(platformPath, fileData,
                                 Collections.singleton(command.getOptionValue(SEARCH_BY_OPT_LONG)));
                         final JavaFile interfaceSource = daoGenerator.generateDaoInterfaceFile(true);
-                        LOG.debug(interfaceSource);
                         final JavaFile implSource = daoGenerator.generateDaoImplementationFile(true);
-                        LOG.debug(implSource);
 
                         String interfacePathStr = interfaceSource.packageName.replaceAll("\\.", File.separator);
                         String implPathStr = implSource.packageName.replaceAll("\\.", File.separator);
                         Path interfacePath = coreExtPath.resolve("src").resolve(interfacePathStr);
                         Path implPath = coreExtPath.resolve("src").resolve(implPathStr);
-                        /*LOG.debug(interfacePath);
-                        LOG.debug(implPath);*/
                         filesToWrite.put(interfacePath.resolve(interfaceSource.typeSpec.name.concat(".java")).toFile(),
                                 interfaceSource.toString());
                         filesToWrite.put(implPath.resolve(implSource.typeSpec.name.concat(".java")).toFile(),
                                 implSource.toString());
+
+                        SpringConfigGenerator gen = new SpringConfigGenerator(SpringConfigGenerator
+                            .getSpringConfigByExtension(coreExtPath));
+                        gen.addBeanForJavaSource(implSource, Collections.singletonMap("flexibleSearchService", "flexibleSearchService"),
+                                null);
                     } break;
                     case SERVICE: {
 
@@ -165,8 +143,48 @@ public final class Main {
         } catch (UnrecognizedOptionException e) {
             LOG.error("Unrecognized option: " + e.getOption(), e);
             new HelpFormatter().printHelp(CMD_LINE_SYNTAX, options);
-        } catch (IOException e) {
+        } catch (IllegalArgumentException e) {
+            LOG.error(e.getMessage());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(e.getMessage(), e);
+            }
+        } catch (Exception e) {
             LOG.error(e.getMessage(), e);
         }
+    }
+
+    private static Optional<Path> selectCoreExtPath(File platformPath) {
+        Path coreExtPath;
+        final CoreExtensionFinder coreFinder = new CoreExtensionFinder(platformPath.toPath());
+        final List<Path> coreExtPathCandidates = coreFinder.findBaseCustomCorePath();
+        if (coreExtPathCandidates.isEmpty()) {
+            LOG.error("Couldn't find custom core extension! Could be an internal error.");
+            // TODO: failover to tmp dir
+            return Optional.empty();
+        }
+        if (coreExtPathCandidates.size() == 1) {
+            coreExtPath = coreExtPathCandidates.iterator().next();
+        } else {
+            System.out.println("Couldn't determine custom core extension name for sure, please " +
+                                       "choose from one of the following candidates:");
+            System.out.println();
+
+            for (int i = 0; i < coreExtPathCandidates.size(); i++) {
+                System.out.println(String.format("%d) %s", i + 1, coreExtPathCandidates.get(i).getFileName().toString()));
+            }
+
+            System.out.println();
+            System.out.print("Please enter number: ");
+            final Scanner scanner = new Scanner(System.in);
+            final int number = scanner.nextInt();
+            if (number < 1 || number > coreExtPathCandidates.size()) {
+                LOG.error("Entered number is invalid!");
+                Optional.empty();
+            }
+            coreExtPath = coreExtPathCandidates.get(number - 1);
+            System.out.println();
+        }
+
+        return Optional.of(coreExtPath);
     }
 }

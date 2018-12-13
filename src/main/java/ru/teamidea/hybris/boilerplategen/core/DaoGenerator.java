@@ -25,6 +25,7 @@ public class DaoGenerator extends AbstractGenerator {
     private static final TypeName FS_QUERY_TYPE = ClassName.get(FS_PACKAGE, FS_QUERY_CLASS);
     private static final TypeName FS_SERVICE_TYPE = ClassName.get(FS_PACKAGE, FS_SERVICE_CLASS);
     private static final TypeName FS_SEARCH_RESULT_TYPE = ClassName.get(FS_PACKAGE, FS_SEARCH_RESULT_CLASS);
+    private static final ClassName SPRING_REQUIRED_ANNOTATION_CLASS = ClassName.get("org.springframework.beans.factory.annotation", "Required");
 
     private final File platformPath;
     private final ModelFileData fileData;
@@ -142,6 +143,7 @@ public class DaoGenerator extends AbstractGenerator {
         final String getFsServiceMethodName = "getFlexibleSearchService";
         MethodSpec setFsServiceMethod = MethodSpec.methodBuilder(setFsServiceMethodName)
                 .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(SPRING_REQUIRED_ANNOTATION_CLASS)
                 .returns(TypeName.VOID)
                 .addParameter(FS_SERVICE_TYPE, fsServiceFieldName)
                 .addStatement("this.$1N = $1N", fsServiceFieldName)
