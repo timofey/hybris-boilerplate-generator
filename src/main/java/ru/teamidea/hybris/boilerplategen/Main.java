@@ -101,37 +101,52 @@ public final class Main {
 
             LOG.info(String.format("Selected core extension: %s", coreExtPath));
             final Set<LayerEnum> layersToGenerate = AbstractGenerator.layersMap.get(generationLayer);
-            for (LayerEnum layerEnum : layersToGenerate) {
-                switch (layerEnum) {
-                    case DAO: {
-                        // generate dao interface
-                        DaoGenerator daoGenerator = new DaoGenerator(platformPath, fileData,
-                                Collections.singleton(command.getOptionValue(SEARCH_BY_OPT_LONG)));
-                        final JavaFile interfaceSource = daoGenerator.generateDaoInterfaceFile(true);
-                        final JavaFile implSource = daoGenerator.generateDaoImplementationFile(true);
 
-                        String interfacePathStr = interfaceSource.packageName.replaceAll("\\.", File.separator);
-                        String implPathStr = implSource.packageName.replaceAll("\\.", File.separator);
-                        Path interfacePath = coreExtPath.resolve("src").resolve(interfacePathStr);
-                        Path implPath = coreExtPath.resolve("src").resolve(implPathStr);
-                        filesToWrite.put(interfacePath.resolve(interfaceSource.typeSpec.name.concat(".java")).toFile(),
-                                interfaceSource.toString());
-                        filesToWrite.put(implPath.resolve(implSource.typeSpec.name.concat(".java")).toFile(),
-                                implSource.toString());
+            JavaFile daoInterface = null;
+            String daoBeanName = null;
+            JavaFile serviceInterface = null;
+            JavaFile serviceImpl = null;
 
-                        SpringConfigGenerator gen = new SpringConfigGenerator(SpringConfigGenerator
-                            .getSpringConfigByExtension(coreExtPath));
-                        gen.addBeanForJavaSource(implSource, Collections.singletonMap("flexibleSearchService", "flexibleSearchService"),
-                                null);
-                    } break;
-                    case SERVICE: {
+            if (layersToGenerate.contains(LayerEnum.DAO)) {
+                // generate dao interface
+                DaoGenerator daoGenerator = new DaoGenerator(platformPath, fileData,
+                        Collections.singleton(command.getOptionValue(SEARCH_BY_OPT_LONG)));
+                final JavaFile interfaceSource = daoInterface = daoGenerator.generateDaoInterfaceFile(true);
+                final JavaFile implSource = daoGenerator.generateDaoImplementationFile(true);
 
-                    } break;
-                    case FACADE: {
+                String interfacePathStr = interfaceSource.packageName.replaceAll("\\.", File.separator);
+                String implPathStr = implSource.packageName.replaceAll("\\.", File.separator);
+                Path interfacePath = coreExtPath.resolve("src").resolve(interfacePathStr);
+                Path implPath = coreExtPath.resolve("src").resolve(implPathStr);
+                filesToWrite.put(interfacePath.resolve(interfaceSource.typeSpec.name.concat(".java")).toFile(),
+                        interfaceSource.toString());
+                filesToWrite.put(implPath.resolve(implSource.typeSpec.name.concat(".java")).toFile(),
+                        implSource.toString());
 
-                    } break;
-                }
-            }
+                SpringConfigGenerator gen = new SpringConfigGenerator(SpringConfigGenerator
+                                                                              .getSpringConfigByExtension(coreExtPath));
+                daoBeanName = gen.addBeanForJavaSource(implSource, Collections.singletonMap("flexibleSearchService", "flexibleSearchService"),
+                        null);
+            } // End Dao
+            if (layersToGenerate.contains(LayerEnum.SERVICE)) {
+                ServiceGenerator serviceGenerator = new ServiceGenerator(platformPath, fileData,
+                        Collections.singleton(command.getOptionValue(SEARCH_BY_OPT_LONG)), daoInterface);
+                final JavaFile interfaceSource = serviceInterface = serviceGenerator.generateServiceInterfaceFile(true);
+                final JavaFile implSource = serviceImpl = serviceGenerator.generateServiceImplementationFile(true);
+
+                String interfacePathStr = interfaceSource.packageName.replaceAll("\\.", File.separator);
+                String implPathStr = implSource.packageName.replaceAll("\\.", File.separator);
+                Path interfacePath = coreExtPath.resolve("src").resolve(interfacePathStr);
+                Path implPath = coreExtPath.resolve("src").resolve(implPathStr);
+                filesToWrite.put(interfacePath.resolve(interfaceSource.typeSpec.name.concat(".java")).toFile(),
+                        interfaceSource.toString());
+                filesToWrite.put(implPath.resolve(implSource.typeSpec.name.concat(".java")).toFile(),
+                        implSource.toString());
+
+                SpringConfigGenerator gen = new SpringConfigGenerator(SpringConfigGenerator.getSpringConfigByExtension(coreExtPath));
+                gen.addBeanForJavaSource(implSource, Collections.singletonMap(serviceGenerator.getDaoFieldName(), daoBeanName),
+                        null);
+            } // End Service
 
             for (Map.Entry<File, String> entry : filesToWrite.entrySet()) {
                 //TODO: check if file exists
@@ -179,7 +194,7 @@ public final class Main {
             final int number = scanner.nextInt();
             if (number < 1 || number > coreExtPathCandidates.size()) {
                 LOG.error("Entered number is invalid!");
-                Optional.empty();
+                return Optional.empty();
             }
             coreExtPath = coreExtPathCandidates.get(number - 1);
             System.out.println();

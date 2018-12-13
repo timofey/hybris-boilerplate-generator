@@ -45,13 +45,15 @@ public class SpringConfigGenerator {
         }
     }
 
-    public void addBeanForJavaSource(JavaFile implSource, Map<String, String> propertiesRefs,
+    public String addBeanForJavaSource(JavaFile implSource, Map<String, String> propertiesRefs,
                         Map<String, String> propertiesValues) throws ModifyException, IOException, NavException, TranscodeException {
         final String className = implSource.packageName.concat(".").concat(implSource.typeSpec.name);
         final String beanName = StringUtils.uncapitalize(implSource.typeSpec.name).replaceFirst("Impl$", "");
 
         LOG.info(String.format("Writing file: %s", this.springConfigPath));
         this.addBean(className, beanName, propertiesRefs, propertiesValues);
+
+        return beanName;
     }
 
     public void addBean(String className, String beanName, Map<String, String> propertiesRefs,
